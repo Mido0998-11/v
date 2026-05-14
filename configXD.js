@@ -1,73 +1,46 @@
-import { watchFile, unwatchFile } from "fs"
-import chalk from "chalk"
-import { fileURLToPath } from "url"
-import fs from "fs"
+import requests
+from bs4 import BeautifulSoup
 
-//*─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─*
+class SUSTEngine:
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
+        self.base_url = "https://el.sustech.edu"
 
-//BETA: Si quiere evitar escribir el número que será bot en la consola, agregué desde aquí entonces:
-//Sólo aplica para opción 2 (ser bot con código de texto de 8 digitos)
-global.botNumber = "" //Ejemplo: 573218138672
+    def login(self, user, pw):
+        try:
+            res = self.session.get(f"{self.base_url}/login/index.php")
+            soup = BeautifulSoup(res.text, 'html.parser')
+            token = soup.find('input', {'name': 'logintoken'})['value']
+            
+            data = {'username': user, 'password': pw, 'logintoken': token}
+            post_res = self.session.post(f"{self.base_url}/login/index.php", data=data)
+            return "login/logout.php" in post_res.text
+        except Exception as e:
+            print(f"Login Error: {e}")
+            return False
 
-//*─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─*
+    def get_courses(self):
+        res = self.session.get(f"{self.base_url}/my/")
+        soup = BeautifulSoup(res.text, 'html.parser')
+        courses = []
+        # مواءمة الكود مع تصميم مودل لجامعة السودان
+        for a in soup.select('.coursename a') or soup.select('h4.multiline a'):
+            courses.append({
+                'name': a.get_text(strip=True),
+                'id': a['href'].split('id=')[-1],
+                'url': a['href']
+            })
+        return courses
 
-global.owner = [
-"51963315293",
-"51978385249",
-"51919199620"
-]
-
-global.suittag = ["51963315293"] 
-global.prems = []
-
-//*─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─*
-
-global.libreria = "Baileys Multi Device"
-global.vs = "^1.8.2 • Latest"
-global.nameqr = "ɢᴏᴊᴏ-ʙᴏᴛ ᴍᴅ"
-global.sessions = "Sessions/Principal"
-global.jadi = "Sessions/SubBot"
-global.kanekiAIJadibts = true
-
-//*─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─*
-
-global.botname = "☃️ 𝗚𝗼𝗷𝗼𝘽𝙤𝙩-𝗠𝗗 ❄️"
-global.textbot = "gσᴊσ вσт ν3 • мα∂є ву ¢αяℓσѕ.яν"
-global.dev = "© ⍴᥆ᥕᥱrᥱძ ᑲᥡ 𝙲𝙰𝚁𝙻𝙾𝚂.𝚁𝚅"
-global.author = "© mᥲძᥱ ᥕі𝗍һ ᑲᥡ ƈαɾʅσʂ.ɾʋ"
-global.etiqueta = "✫ᴄᴀʀʟᴏs ʀᴀᴍɪʀᴇᴢ❄️ ⊹꙰ "
-global.currency = "ᴅᴏʟᴀʀᴇs💶"
-global.banner = "https://files.catbox.moe/2tqywz.jpg"
-global.icono = "https://files.catbox.moe/e6br3k.jpg"
-global.catalogo = fs.readFileSync('./lib/catalogo.jpg')
-
-//*─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─*
-
-global.group = "https://chat.whatsapp.com/IDo5RtlTvyt59hqj7E9O28?mode=wwt"
-global.community = "https://chat.whatsapp.com/IDo5RtlTvyt59hqj7E9O28?mode=wwt"
-global.channel = "https://whatsapp.com/channel/0029VbBGlokA89MliWWv1x16"
-global.github = "https://github.com/Carlos13ra/GOJOBOT-MD"
-global.gmail = "shadowcore.xyz@gmail.com"
-global.ch = {
-ch1: "120363421367237421@newsletter"
-}
-
-//*─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─*
-
-global.APIs = {
-xyro: { url: "https://xyro.site", key: null },
-yupra: { url: "https://api.yupra.my.id", key: null },
-vreden: { url: "https://api.vreden.web.id", key: null },
-delirius: { url: "https://api.delirius.store", key: null },
-zenzxz: { url: "https://api.zenzxz.my.id", key: null },
-siputzx: { url: "https://api.siputzx.my.id", key: null }
-}
-
-//*─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─⭒─ׄ─ׅ─ׄ─*
-
-let file = fileURLToPath(import.meta.url)
-watchFile(file, () => {
-unwatchFile(file)
-console.log(chalk.redBright("Update 'configXD.js'"))
-import(`${file}?update=${Date.now()}`)
-})
+    def get_videos(self, course_id):
+        course_url = f"{self.base_url}/course/view.php?id={course_id}"
+        res = self.session.get(course_url)
+        soup = BeautifulSoup(res.text, 'html.parser')
+        videos = []
+        for a in soup.find_all('a', href=True):
+            if '.mp4' in a['href'] or 'video' in a['href']:
+                videos.append({'title': a.get_text(strip=True), 'url': a['href']})
+        return videos
