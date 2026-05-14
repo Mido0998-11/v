@@ -1,70 +1,91 @@
 import os
 import threading
 from flask import Flask
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, Update, ReplyKeyboardRemove
+from telegram.ext import (
+    ApplicationBuilder, CommandHandler, MessageHandler, 
+    CallbackQueryHandler, filters, ContextTypes, ConversationHandler
+)
 from engine import SUSTEngine
 
-# --- إعداد سيرفر Flask لـ Render ---
+# --- إعدادات Flask لـ Render ---
 web_app = Flask('')
-
 @web_app.route('/')
-def home():
-    return "Bot is Running"
+def home(): return "SUST Bot is Live!"
 
 def run_web():
     port = int(os.environ.get("PORT", 8080))
     web_app.run(host='0.0.0.0', port=port)
 
-# --- إعدادات البوت ---
-TOKEN = os.environ.get('BOT_TOKEN', '8215409550:AAGAZazGrhP8-vqn9XwrHJu0pVuZuhTTd0s')
+# --- ثوابت المحادثة ---
+CHOOSING, TYPING_USER, TYPING_PASS = range(3)
+TOKEN = os.environ.get('BOT_TOKEN') # اسحب التوكن من رندر
+
 user_sessions = {}
 
+# --- دوال البوت ---
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # أزرار الكيبورد الثابتة (Reply Keyboard)
-    main_kb = [['📚 موادي', '👤 حسابي'], ['❓ مساعدة']]
-    reply_markup = ReplyKeyboardMarkup(main_kb, resize_keyboard=True)
+    reply_kb = [['🔐 تسجيل الدخول'], ['📚 مقرراتي الدراسية'], ['👤 حسابي', '🚪 خروج']]
+    markup = ReplyKeyboardMarkup(reply_kb, resize_keyboard=True)
     
-    msg = (
-        "🎓 **مرحباً بك في منصة SUST الذكية**\n\n"
-        "لتصفح موادك، يرجى إرسال بيانات الدخول كالتالي:\n"
-        "`الرقم_الجامعي:كلمة_السر`"
+    await update.message.reply_text(
+        "🎓 **مرحباً بك في منصة SUST الذكية**\n\nأنا مساعدك الرقمي للوصول لمحاضراتك وفيديوهاتك بسرعة.\nاختر من القائمة أدناه للبدء.",
+        reply_markup=markup, parse_mode='Markdown'
     )
-    await update.message.reply_text(msg, reply_markup=reply_markup, parse_mode='Markdown')
 
-async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text
+async def login_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("👤 يرجى إرسال **الرقم الجامعي** الخاص بك:", parse_mode='Markdown', reply_markup=ReplyKeyboardRemove())
+    return TYPING_USER
+
+async def get_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data['temp_user'] = update.message.text
+    await update.message.reply_text("🔑 الآن أرسل **كلمة المرور**:\n(سيتم مسحها تلقائياً للأمان 🛡️)", parse_mode='Markdown')
+    return TYPING_PASS
+
+async def get_pass(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    pw = update.message.text
+    user = context.user_data['temp_user']
     cid = update.effective_chat.id
+    
+    # مسح رسالة الباسورد للأمان
+    try: await update.message.delete()
+    except: pass
 
-    if ":" in text: # معالجة تسجيل الدخول
-        user, pw = text.split(":", 1)
-        await update.message.reply_text("⏳ جاري الدخول للمنصة...")
-        engine = SUSTEngine()
-        if engine.login(user, pw):
-            user_sessions[cid] = engine
-            await update.message.reply_text("✅ تم الدخول بنجاح! يمكنك الآن الضغط على '📚 موادي'.")
-        else:
-            await update.message.reply_text("❌ فشل الدخول. تأكد من بياناتك.")
+    status_msg = await update.message.reply_text("⏳ **جاري التحقق من بياناتك في المنصة...**", parse_mode='Markdown')
+    
+    engine = SUSTEngine()
+    if engine.login(user, pw):
+        user_sessions[cid] = engine
+        await context.bot.edit_message_text(
+            chat_id=cid, message_id=status_msg.message_id,
+            text="✅ **تم تسجيل الدخول بنجاح!**\nيمكنك الآن تصفح محاضراتك من القائمة.",
+            parse_mode='Markdown'
+        )
+        # إعادة الكيبورد الرئيسي
+        await start(update, context)
+    else:
+        await context.bot.edit_message_text(
+            chat_id=cid, message_id=status_msg.message_id,
+            text="❌ **بيانات خاطئة!**\nيرجى المحاولة مرة أخرى بالضغط على زر الدخول."
+        )
+    return ConversationHandler.END
 
-    elif text == '📚 موادي':
-        if cid not in user_sessions:
-            await update.message.reply_text("⚠️ سجل دخولك أولاً.")
-            return
-        
-        await update.message.reply_text("🔄 جاري سحب موادك من المنصة...")
-        courses = user_sessions[cid].get_courses()
-        
-        if not courses:
-            await update.message.reply_text("🧐 لا توجد مواد مسجلة.")
-            return
+async def show_courses(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    cid = update.effective_chat.id
+    if cid not in user_sessions:
+        await update.message.reply_text("⚠️ يرجى تسجيل الدخول أولاً باستخدام زر '🔐 تسجيل الدخول'.")
+        return
 
-        # أزرار مواد متغيرة (Inline Keyboard)
-        btns = [[InlineKeyboardButton(c['name'], callback_data=f"c_{c['id']}")] for c in courses]
-        await update.message.reply_text("📖 اختر المادة لعرض فيديوهاتها:", reply_markup=InlineKeyboardMarkup(btns))
+    wait = await update.message.reply_text("🔄 جاري سحب قائمة المواد...")
+    courses = user_sessions[cid].get_courses()
+    
+    if not courses:
+        await wait.edit_text("🧐 لم أجد مواد مسجلة حالياً.")
+        return
 
-    elif text == '👤 حسابي':
-        status = "متصل ✅" if cid in user_sessions else "غير مسجل ❌"
-        await update.message.reply_text(f"👤 **حالة الحساب:** {status}", parse_mode='Markdown')
+    btns = [[InlineKeyboardButton(f"📖 {c['name']}", callback_data=f"c_{c['id']}")] for c in courses]
+    await wait.edit_text("📚 **مقرراتك الدراسية:**", reply_markup=InlineKeyboardMarkup(btns), parse_mode='Markdown')
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -76,23 +97,37 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         vids = user_sessions[cid].get_videos(course_id)
         
         if not vids:
-            await query.message.reply_text("📭 لا توجد فيديوهات في هذه المادة.")
+            await query.message.reply_text("📭 لا توجد فيديوهات مرفوعة في هذه المادة.")
             return
         
         for v in vids:
-            # إرسال روابط الفيديوهات
-            await context.bot.send_message(chat_id=cid, text=f"🎥 **{v['title']}**\n🔗 {v['url']}", parse_mode='Markdown')
+            await context.bot.send_message(chat_id=cid, text=f"🎬 **{v['title']}**\n🔗 [رابط الفيديو المباشر]({v['url']})", parse_mode='Markdown')
 
-# --- تشغيل البوت ---
+async def logout(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    cid = update.effective_chat.id
+    if cid in user_sessions: del user_sessions[cid]
+    await update.message.reply_text("👋 تم تسجيل الخروج بنجاح. نراك لاحقاً!")
+
 if __name__ == '__main__':
-    # تشغيل Flask في خيط منفصل
     threading.Thread(target=run_web).start()
     
-    # تشغيل البوت
     app = ApplicationBuilder().token(TOKEN).build()
+    
+    # معالج المحادثة الاحترافي لتسجيل الدخول
+    conv_handler = ConversationHandler(
+        entry_points=[MessageHandler(filters.Regex('^🔐 تسجيل الدخول$'), login_start)],
+        states={
+            TYPING_USER: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_user)],
+            TYPING_PASS: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_pass)],
+        },
+        fallbacks=[CommandHandler('start', start)],
+    )
+
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.add_handler(conv_handler)
+    app.add_handler(MessageHandler(filters.Regex('^📚 مقرراتي الدراسية$'), show_courses))
+    app.add_handler(MessageHandler(filters.Regex('^🚪 خروج$'), logout))
     app.add_handler(CallbackQueryHandler(callback_handler))
     
-    print("🚀 البوت والسيرفر يعملا الآن...")
+    print("🚀 المنصة الاحترافية تعمل الآن...")
     app.run_polling()
