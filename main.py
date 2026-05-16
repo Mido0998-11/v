@@ -11,7 +11,7 @@ from engine import SUSTEngine
 
 web_app = Flask('')
 @web_app.route('/')
-def home(): return "SUST Streaming Core Active"
+def home(): return "SUST Full Platform Super Charged"
 
 def run_web():
     port = int(os.environ.get("PORT", 8080))
@@ -22,17 +22,17 @@ TOKEN = os.environ.get('BOT_TOKEN', '8215409550:AAGAZazGrhP8-vqn9XwrHJu0pVuZuhTT
 STEP_USER, STEP_PASS = range(2)
 user_sessions = {}
 user_names = {}
-video_storage = {} # تخزين مؤقت لروابط الفيديوهات الطويلة لتلجرام
+video_storage = {}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
     if cid in user_sessions:
-        name = user_names.get(cid, "دكتور")
-        kb = [['📚 مقرراتي الدراسية'], ['📊 كشف الدرجات الشامل'], ['🚪 تسجيل خروج']]
-        await update.message.reply_text(f"✨ **مرحباً بك مجدداً، {name}**\nكل سستم المنصة جاهز تحت أمرك الآن.", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True), parse_mode='Markdown')
+        name = user_names.get(cid, "يا دكتور")
+        kb = [['📚 مقرراتي الدراسية', '📊 كشف الدرجات'], ['📅 المفكرة والأحداث', '👤 ملفي الشخصي'], ['🚪 تسجيل خروج']]
+        await update.message.reply_text(f"✨ **مرحباً بك مجدداً، {name}**\nلوحة تحكم منصة جامعة السودان كاملة بين يديك الآن.", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True), parse_mode='Markdown')
     else:
         kb = [['🔐 ابدأ تسجيل الدخول الإلزامي']]
-        await update.message.reply_text("🔒 **بوابة جامعة السودان الأمنية**\n\nالسستم مقفل بالكامل، يرجى إثبات هويتك الأكاديمية لتتمكن من تشغيل المحاضرات وسحب الملفات والدرجات.", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True), parse_mode='Markdown')
+        await update.message.reply_text("🔒 **بوابة جامعة السودان الذكية (SUST)**\n\nالسستم مقفل بشكل صارم وإلزامي؛ الرجاء إثبات هويتك الأكاديمية لفتح الصلاحيات وسحب ملفاتك وفيديوهاتك.", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True), parse_mode='Markdown')
 
 async def login_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("👤 **الخطوة 1:** أرسل **الرقم الجامعي** الخاص بك:", reply_markup=ReplyKeyboardRemove(), parse_mode='Markdown')
@@ -40,7 +40,7 @@ async def login_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def process_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['username'] = update.message.text
-    await update.message.reply_text("🔑 **الخطوة 2:** أرسل **كلمة المرور** الخاصة بك:\n_(سيتم حذفها فوراً تلقائياً للأمان التام 🛡️)_", parse_mode='Markdown')
+    await update.message.reply_text("🔑 **الخطوة 2:** أرسل **كلمة المرور** الخاصة بك:\n_(تنبيه: سيتم مسحها فوراً لحمايتك 🛡️)_", parse_mode='Markdown')
     return STEP_PASS
 
 async def process_pass(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -50,21 +50,20 @@ async def process_pass(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try: await update.message.delete()
     except: pass
     
-    status_msg = await update.message.reply_text("⏳ جاري فحص الحساب ومطابقة الهوية في سستم الجامعة الأكاديمي...")
+    status_msg = await update.message.reply_text("⏳ جاري فحص الحساب ومطابقة الاسم والبيانات في السستم الحقيقي...")
     engine = SUSTEngine()
     if engine.login(user, pw):
         user_sessions[cid] = engine
-        data = engine.get_profile_and_courses()
-        real_name = data['name']
-        user_names[cid] = real_name
+        prof = engine.get_user_profile()
+        user_names[cid] = prof['name']
         
-        await context.bot.edit_message_text(chat_id=cid, message_id=status_msg.message_id, text=f"🎉 **مرحباً بك دكتور: {real_name}**\n\n✅ تم التحقق بنجاح وفتح كامل المنصة داخل البوت!", parse_mode='Markdown')
-        kb = [['📚 مقرراتي الدراسية'], ['📊 كشف الدرجات الشامل'], ['🚪 تسجيل خروج']]
-        await context.bot.send_message(chat_id=cid, text="🗂️ تحكم بكامل المنصة من القائمة أدناه:", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+        await context.bot.edit_message_text(chat_id=cid, message_id=status_msg.message_id, text=f"🎉 **مرحباً بك دكتور: {prof['name']}**\n\n✅ تم تسجيل الدخول بنجاح! السستم مفتوح بالكامل الآن لك.", parse_mode='Markdown')
+        kb = [['📚 مقرراتي الدراسية', '📊 كشف الدرجات'], ['📅 المفكرة والأحداث', '👤 ملفي الشخصي'], ['🚪 تسجيل خروج']]
+        await context.bot.send_message(chat_id=cid, text="🗂️ القائمة الكاملة للمنصة:", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
         return ConversationHandler.END
     else:
         kb = [['🔐 ابدأ تسجيل الدخول الإلزامي']]
-        await context.bot.edit_message_text(chat_id=cid, message_id=status_msg.message_id, text="❌ **بيانات خاطئة!** لم نتمكن من مطابقة الحساب. اضغط على الزر وحاول مجدداً.")
+        await context.bot.edit_message_text(chat_id=cid, message_id=status_msg.message_id, text="❌ **فشل التحقق!** البيانات خاطئة. اضغط على الزر للبدء من جديد.")
         return ConversationHandler.END
 
 async def strict_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -72,33 +71,48 @@ async def strict_guard(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     
     if cid in user_sessions:
+        engine = user_sessions[cid]
         if text == '📚 مقرراتي الدراسية':
-            status = await update.message.reply_text("🔍 جاري فحص حسابك وسحب المقررات الحالية والقديمة المتاحة...")
-            data = user_sessions[cid].get_profile_and_courses()
-            courses = data['courses']
+            status = await update.message.reply_text("🔍 جاري فحص صفحة المقررات الشاملة وسحب المواد...")
+            courses = engine.get_courses()
             if not courses:
-                await status.edit_text("📭 لم نجد مواد مسجلة نشطة حالياً في البروفايل.")
+                await status.edit_text("📭 لم نجد مواد مسجلة حالياً.")
                 return
             btns = [[InlineKeyboardButton(f"📖 {c['name']}", callback_data=f"c_{c['id']}")] for c in courses]
-            await status.edit_text("📚 **اختر المادة لعرض (كل محتوياتها ومحاضراتها المرئية):**", reply_markup=InlineKeyboardMarkup(btns), parse_mode='Markdown')
+            await status.edit_text("📚 **اختر المقرر لتصفح (الفيديوهات والملفات والشيتات):**", reply_markup=InlineKeyboardMarkup(btns), parse_mode='Markdown')
         
-        elif text == '📊 كشف الدرجات الشامل':
-            status = await update.message.reply_text("📊 جاري فحص وتجميع كشف العلامات الحالي...")
-            grades = user_sessions[cid].get_student_grades()
+        elif text == '📊 كشف الدرجات':
+            status = await update.message.reply_text("📊 جاري قراءة الكنترول وسحب علاماتك الدراسية...")
+            grades = engine.get_student_grades()
             if not grades:
-                await status.edit_text("🧐 لم يتم رصد درجات حالياً أو أن صفحة الكنترول مغلقة.")
+                await status.edit_text("🧐 لا توجد درجات مرصودة حتى الآن.")
                 return
-            report = f"📊 **كشف الدرجات الأكاديمي الشامل للجامعة:**\n\n"
-            for g in grades: report += f"🔹 *{g['course']}:*\n🎯 الدرجة المرصودة: `{g['grade']}`\n\n"
+            report = "📊 **كشف الدرجات الأكاديمي الحالي:**\n\n"
+            for g in grades: report += f"🔹 *{g['course']}:*\n🎯 الدرجة: `{g['grade']}`\n\n"
             await status.edit_text(report, parse_mode='Markdown')
+            
+        elif text == '📅 المفكرة والأحداث':
+            status = await update.message.reply_text("📅 جاري فحص تقويم المنصة للأحداث والواجبات...")
+            events = engine.get_calendar_events()
+            if not events:
+                await status.edit_text("✅ لا توجد أحداث أو واجبات قادمة مطلوبة منك حالياً.")
+                return
+            report = "📅 **الأحداث والواجبات القادمة في التقويم:**\n\n"
+            for e in events: report += f"🚨 *{e['title']}*\n⏰ الموعد: `{e['date']}`\n\n"
+            await status.edit_text(report, parse_mode='Markdown')
+            
+        elif text == '👤 ملفي الشخصي':
+            prof = engine.get_user_profile()
+            report = f"👤 **الملف الأكاديمي للطالب:**\n\nاسم الطالب: `{prof['name']}`\nالبريد الإلكتروني: `{prof['email']}`\nالحالة الأكاديمية: نشط ✅"
+            await update.message.reply_text(report, parse_mode='Markdown')
             
         elif text == '🚪 تسجيل خروج':
             if cid in user_sessions: del user_sessions[cid]
             kb = [['🔐 ابدأ تسجيل الدخول الإلزامي']]
-            await update.message.reply_text("🔒 تم تسجيل الخروج بنجاح وتأمين بياناتك.", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+            await update.message.reply_text("🔒 تم تسجيل الخروج بنجاح وتأمين بياناتك الأكاديمية.", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
     else:
         kb = [['🔐 ابدأ تسجيل الدخول الإلزامي']]
-        await update.message.reply_text("🚫 **الوصول مرفوض تماماً!** السستم مغلق ومحمي، سجل دخولك أولاً لتتمكن من استخدامه.", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
+        await update.message.reply_text("🚫 **الوصول مرفوض!** البوت محمي، يرجى تسجيل الدخول أولاً.", reply_markup=ReplyKeyboardMarkup(kb, resize_keyboard=True))
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -106,64 +120,52 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cid = update.effective_chat.id
 
     if cid not in user_sessions:
-        await query.message.reply_text("⚠️ انتهت جلستك، أعد تسجيل الدخول.")
+        await query.message.reply_text("⚠️ انتهت جلستك الأمنيّة.")
         return
 
-    # 1. عند اختيار مادة: نعرض كل شيء (ملفات، مجلدات، صفحات)
     if query.data.startswith("c_"):
         course_id = query.data.split("_")[1]
-        progress = await query.message.reply_text("🔄 جاري عمل فحص عميق للمادة وقراءة كل الملفات والمحاضرات المرفوعة حالياً وسابقاً...")
+        progress = await query.message.reply_text("🔄 جاري الكشط المتعمق وقراءة كافة الفيديوهات والمحاضرات القديمة والحالية...")
         
         all_content = user_sessions[cid].get_course_deep_content(course_id)
         if not all_content:
-            await progress.edit_text("📭 لا توجد ملفات أو محتويات مرفوعة داخل هذه المادة حالياً.")
+            await progress.edit_text("📭 المادة لا تحتوي على ملفات أو فيديوهات مرفوعة.")
             return
             
         await progress.delete()
-        
-        # إرسال المحتويات العادية، وإذا كان فيديو نضع له زر تشغيل فوري جوه تلجرام
         for item in all_content:
             if "🎥 فيديو مباشر" in item['type']:
-                vid_id = str(uuid.uuid4())[:8] # توليد ID قصير للرابط
+                vid_id = str(uuid.uuid4())[:8]
                 video_storage[vid_id] = item['url']
-                btn = InlineKeyboardMarkup([[InlineKeyboardButton("▶️ تشغيل المحاضرة داخل تلجرام", callback_data=f"play_{vid_id}")]])
+                btn = InlineKeyboardMarkup([[InlineKeyboardButton("▶️ تشغيل فوري داخل تلجرام", callback_data=f"play_{vid_id}")]])
                 await context.bot.send_message(chat_id=cid, text=f"🎬 **محاضرة مرئية مكتشفة:**\n🔹 {item['title']}", reply_markup=btn, parse_mode='Markdown')
             else:
                 await context.bot.send_message(chat_id=cid, text=f"{item['type']}:\n🔹 [{item['title']}]({item['url']})", parse_mode='Markdown')
 
-    # 2. ماسورة الدفق (هنا السحر! تشغيل الفيديو مباشرة جوه تلجرام)
     elif query.data.startswith("play_"):
         vid_id = query.data.split("_")[1]
         video_url = video_storage.get(vid_id)
         if not video_url:
-            await query.message.reply_text("⚠️ الرابط منتهي الصلاحية، يرجى إعادة تحديث قائمة المواد.")
+            await query.message.reply_text("⚠️ الرابط منتهي.")
             return
             
-        loading = await query.message.reply_text("📥 جاري فتح قناة آمنة ودفق المحاضرة المرئية لتشغيلها داخل تلجرام مباشرة... انتظر ثواني...")
-        
+        loading = await query.message.reply_text("📥 جاري الدفق السريع للمحاضرة المرئية وتشغيلها داخل مشغل تلجرام... انتظر لحظات...")
         try:
             engine = user_sessions[cid]
-            # طلب دفق البيانات لايف بالكوكيز حقت الطالب
             res = engine.session.get(video_url, stream=True, timeout=30)
             cl = res.headers.get('Content-Length')
             size = int(cl) if cl else 0
             
-            # إذا كان الفيديو حجمه أقل من 50 ميجا (حد رفع تلجرام الأقصى للبوتات)
             if 0 < size < 50 * 1024 * 1024:
                 await context.bot.send_video(
-                    chat_id=cid,
-                    video=res.raw, # ضخ محتوى السيرفر مباشرة لتلجرام دون حفظه في الرام
-                    filename="lecture.mp4",
-                    supports_streaming=True, # السماح للمستخدم بتشغيله فوراً أثناء التحميل المباشر
-                    caption="🎬 **تم دفق المحاضرة بنجاح وجاهزة للمشاهدة الفورية!**",
-                    parse_mode='Markdown'
+                    chat_id=cid, video=res.raw, filename="lecture.mp4",
+                    supports_streaming=True, caption="🎬 **مشاهدة ممتعة! تم دفق المحاضرة بنجاح.**", parse_mode='Markdown'
                 )
                 await loading.delete()
             else:
-                # إذا كان أكبر من 50 ميجا، نرسل له رابط المشاهدة المباشر يفتح في المتصفح تلقائياً
-                await loading.edit_text(f"ℹ️ حجم هذه المحاضرة كبير جداً ({round(size/(1024*1024), 1)} MB) ويتخطى حد الدفق السريع لبوتات تلجرام، يمكنك الضغط على الرابط ومشاهدته فوراً في المتصفح:\n\n🔗 {video_url}")
-        except Exception as e:
-            await loading.edit_text(f"🔗 سيرفر الجامعة يمنع البث الخارجي المباشر، يمكنك فتح الرابط ومشاهدته من المتصفح فوراً:\n\n{video_url}")
+                await loading.edit_text(f"ℹ️ حجم المحاضرة كبير جداً ({round(size/(1024*1024), 1)} MB)، يمكنك مشاهدتها فوراً في المتصفح من الرابط السريع المباشر:\n\n🔗 {video_url}")
+        except:
+            await loading.edit_text(f"🎥 يمكنك فتح الرابط ومشاهدة المحاضرة من المتصفح فوراً دون استهلاك كوكيز السيرفر:\n\n🔗 {video_url}")
 
 if __name__ == '__main__':
     threading.Thread(target=run_web).start()
