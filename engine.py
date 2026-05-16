@@ -21,34 +21,38 @@ class SUSTEngine:
         except:
             return False
 
-    def get_courses(self):
-        """سحب المواد من صفحة البروفايل الثابتة لضمان الدقة 100%"""
+    def get_profile_and_courses(self):
+        """سحب اسم الطالب الرسمي وقائمة مواده من البروفايل مباشرة"""
         try:
-            # صفحة البروفايل تحتوي على روابط المواد كـ HTML كلاسيكي
             res = self.session.get(f"{self.base_url}/user/profile.php", timeout=10)
             soup = BeautifulSoup(res.text, 'html.parser')
-            courses = []
             
-            # البحث عن أي رابط يوجه لصفحة مادة
+            # 1. صيد اسم الطالب من عنوان الصفحة الرئيسي (Moodle يضعه في h1)
+            student_name = "طالب SUST"
+            name_tag = soup.find('h1') or soup.select_one('.page-header-headings h1')
+            if name_tag:
+                student_name = name_tag.get_text(strip=True)
+
+            # 2. سحب المواد
+            courses = []
             for a in soup.find_all('a', href=True):
                 if 'course/view.php?id=' in a['href']:
                     name = a.get_text(strip=True)
                     course_id = a['href'].split('id=')[-1].split('&')[0]
-                    
-                    # تنظيف الاسم من أي رموز غريبة
                     if name and not name.isdigit() and len(name) > 3:
                         courses.append({'name': name, 'id': course_id})
             
-            # حذف المواد المكررة بنقاء
+            # تنظيف التكرار
             seen = set()
             unique_courses = []
             for c in courses:
                 if c['id'] not in seen:
                     seen.add(c['id'])
                     unique_courses.append(c)
-            return unique_courses
+                    
+            return {"name": student_name, "courses": unique_courses}
         except:
-            return []
+            return {"name": "طالب SUST", "courses": []}
 
     def get_videos(self, course_id):
         try:
@@ -60,5 +64,4 @@ class SUSTEngine:
                 if '.mp4' in a['href'] or 'video' in a['href']:
                     videos.append({'title': a.get_text(strip=True) or "محاضرة فيديو", 'url': a['href']})
             return videos
-        except:
-            return []
+        except: return []
