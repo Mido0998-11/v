@@ -21,7 +21,6 @@ class SUSTEngine:
         except: return False
 
     def get_profile_and_courses(self):
-        """سحب اسم الطالب ومواده من البروفايل"""
         try:
             res = self.session.get(f"{self.base_url}/user/profile.php", timeout=15)
             soup = BeautifulSoup(res.text, 'html.parser')
@@ -48,69 +47,69 @@ class SUSTEngine:
         except: return {"name": "طالب SUST", "courses": []}
 
     def get_student_grades(self):
-        """سحب كشف الدرجات الشامل لجميع المواد من سستم العلامات المركزي"""
         try:
             res = self.session.get(f"{self.base_url}/grade/report/overview/index.php", timeout=15)
             soup = BeautifulSoup(res.text, 'html.parser')
             grades_list = []
-            
-            # البحث عن جدول الدرجات الشهير في مودل
             table = soup.find('table', {'id': 'overview-grade'})
             if table:
-                for row in table.find_all('tr')[1:]: # تخطي الهيدر
+                for row in table.find_all('tr')[1:]:
                     cols = row.find_all('td')
                     if len(cols) >= 2:
-                        course_name = cols[0].get_text(strip=True)
-                        grade_val = cols[1].get_text(strip=True)
-                        grades_list.append({'course': course_name, 'grade': grade_val})
+                        grades_list.append({
+                            'course': cols[0].get_text(strip=True),
+                            'grade': cols[1].get_text(strip=True)
+                        })
             return grades_list
         except: return []
 
     def get_course_deep_content(self, course_id):
-        """رادار صيد الفيديوهات المخفية والملفات والتكليفات"""
+        """كشط متغلغل لكل المحتويات والملفات القديمة والبحث داخل الصفحات الفرعية عن الفيديوهات"""
         try:
             url = f"{self.base_url}/course/view.php?id={course_id}"
             res = self.session.get(url, timeout=15)
             soup = BeautifulSoup(res.text, 'html.parser')
             content_list = []
             
-            # 1. صيد الفيديوهات الاحترافي (المخفية داخل وسوم الفيديو والمشغلات)
-            for video in soup.find_all(['video', 'source']):
-                v_url = video.get('src') or video.get('data-src')
-                if v_url:
-                    content_list.append({'title': '🎬 محاضرة مرئية (تشغيل فوري)', 'url': v_url, 'type': '🎥 فيديو مباشر'})
-            
-            for iframe in soup.find_all('iframe', src=True):
-                if 'youtube' in iframe['src'] or 'vimeo' in iframe['src'] or 'video' in iframe['src']:
-                    content_list.append({'title': '📺 فيديو محاضرات مضمن خارجي', 'url': iframe['src'], 'type': '🎥 فيديو مباشر'})
-
-            # 2. كشط باقي الأنشطة الكلاسيكية (ملفات، واجبات، روابط)
-            activities = soup.select('li.activity')
-            for activity in activities:
-                classes = activity.get('class', [])
-                act_type = "unknown"
-                for c in classes:
-                    if 'modtype_' in c: act_type = c.replace('modtype_', '')
+            # فحص كل الروابط والأنشطة التعليمية في الصفحة (بما فيها المواد المرفوعة سابقاً)
+            for a in soup.find_all('a', href=True):
+                href = a['href']
+                title = a.get_text(strip=True)
+                if not title or len(title) < 2 or 'تخطي' in title: continue
                 
-                a_tag = activity.find('a', href=True)
-                if not a_tag: continue
+                title = title.replace(' File', '').replace(' URL', '').replace(' Assignment', '').replace(' Page', '')
                 
-                title = a_tag.get_text(strip=True).replace(' File', '').replace(' URL', '').replace(' Assignment', '')
-                href = a_tag['href']
-                
-                if act_type == 'resource' or '.pdf' in href:
-                    icon = "📄 ملف / محاضرة PDF"
-                elif act_type == 'url':
-                    # إذا كان الرابط الخارجي يؤدي لفيديو
-                    icon = "🎥 فيديو / رابط خارجي" if any(x in href for x in ['youtube', 'mp4', 'vimeo', 'drive']) else "🔗 رابط دراسي"
-                elif act_type == 'assign':
-                    icon = "📝 تكليف / شيت مطلوب"
-                elif act_type == 'quiz':
-                    icon = "❓ إختبار قصير (Quiz)"
-                else:
-                    icon = "💡 محتوى مقرر"
-                    
-                content_list.append({'title': title, 'url': href, 'type': icon})
-                
-            return content_list
+                # تصنيف المحتوى بدقة
+                if 'mod/resource/view.php' in href:
+                    content_list.append({'title': title, 'url': href, 'type': '📄 ملف / محاضرة'})
+                elif 'mod/assign/view.php' in href:
+                    content_list.append({'title': title, 'url': href, 'type': '📝 تكليف / شيت'})
+                elif 'mod/folder/view.php' in href:
+                    content_list.append({'title': title, 'url': href, 'type': '📁 مجلد ملفات كامل'})
+                elif 'mod/url/view.php' in href:
+                    content_list.append({'title': title, 'url': href, 'type': '🔗 رابط دراسي / فيديو خارجي'})
+                elif 'mod/page/view.php' in href:
+                    # الدخول التلقائي للصفحات الفرعية لصيد الفيديوهات المخبأة جواها!
+                    try:
+                        sub_res = self.session.get(href, timeout=5)
+                        sub_soup = BeautifulSoup(sub_res.text, 'html.parser')
+                        found_video = False
+                        for media in sub_soup.find_all(['video', 'source', 'iframe']):
+                            v_url = media.get('src') or media.get('data-src')
+                            if v_url:
+                                content_list.append({'title': f"🎬 {title} (محاضرة مرئية)", 'url': v_url, 'type': '🎥 فيديو مباشر'})
+                                found_video = True
+                        if not found_video:
+                            content_list.append({'title': title, 'url': href, 'type': '📄 صفحة محتوى'})
+                    except:
+                        content_list.append({'title': title, 'url': href, 'type': '📄 صفحة محتوى'})
+                        
+            # تنظيف الروابط المكررة
+            seen = set()
+            unique_content = []
+            for item in content_list:
+                if item['url'] not in seen:
+                    seen.add(item['url'])
+                    unique_content.append(item)
+            return unique_content
         except: return []
